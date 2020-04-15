@@ -1,7 +1,7 @@
-class Base(object):
-    def __init__(self):
-        self.date = 
-        self.forestMask 
+class base(object):
+	def __init__(self):
+		self.date = 123
+		# self.forestMask
 
 class Fire(base):
 	def __inti__(self):
@@ -18,22 +18,6 @@ class Fire(base):
 		out = out.updateMask(remapped.gte(2));
 
 		return out
-
-
-	def getFire(self,targetYear,targetMonth):
-		#Bring in MYD14/MOD14
-		modisFireAqua = ee.ImageCollection('MODIS/006/MYD14A2').select([0]);
-		modisFireTerra = ee.ImageCollection('MODIS/006/MOD14A2').select([0]);
-		modisFire = modisFireTerra.merge(modisFireAqua);
-		singleMonth = modisFire.filter(ee.Filter.calendarRange(targetYear,targetYear,'year'))/
-		                        .filter(ee.Filter.calendarRange(targetMonth,targetMonth,'month'));
-
-		#Recode it, and find the year, month, and day- then add it to the map
-		singleMonth = singleMonth.map(self.reclassify);
-		sum_denisty = singleMonth.select('binary').sum().rename('denisty')
-
-		return singleMonth.mosaic().addBands(sum_denisty)
-
 	def burnOut(self,sd,step,unit):
 		"""takes in a startdate as ee.Date() -maybe change to string later step as an interger
 		unit of time as string (e.g. 'day','month','year') """
@@ -50,10 +34,21 @@ class Fire(base):
 		newFires = currentFires.where(mask.eq(1),0).selfMask()
 		allCurrentFires = currentFires.select('binary').rename('allFires')
 
-
 		return newFires.addBands(allCurrentFires)
-  
-  
+
+	def getFire(self,targetYear,targetMonth):
+		#Bring in MYD14/MOD14
+		modisFireAqua = ee.ImageCollection('MODIS/006/MYD14A2').select([0]);
+		modisFireTerra = ee.ImageCollection('MODIS/006/MOD14A2').select([0]);
+		modisFire = modisFireTerra.merge(modisFireAqua);
+		singleMonth = modisFire.filter(ee.Filter.calendarRange(targetYear,targetYear,'year')) .filter(ee.Filter.calendarRange(targetMonth,targetMonth,'month'));
+
+		#Recode it, and find the year, month, and day- then add it to the map
+		singleMonth = singleMonth.map(self.reclassify);
+		sum_denisty = singleMonth.select('binary').sum().rename('denisty')
+
+		return singleMonth.mosaic().addBands(sum_denisty)
+
 
 class Vegetation(base):
 	def __inti__(self):
@@ -100,3 +95,22 @@ class Vegetation(base):
 
 		return ee.Image.cat([month_i_mean, aandvi, sandvi, vci])
 
+class Water(base):
+	def __inti__(self):
+		super(Water, self).__init__()
+	def waterindicies(image):
+		# T NDMI
+		# todo: do we want to keep band names or remap in import?
+		tndmi = image.normalizedDifference(['B8', 'B11']).add(0.5).sqrt().rename('tndmi')
+		tndvi = image.normalizedDifference(['NIR', 'RED']).add(0.5).sqrt().rename('tndvi')
+		#NMDI - normalized multiband drought
+		# https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2007GL031021
+		# B8A - (B11 - B12) / B8A + (B11 + B12)
+		nmdi = image.divide(1000)
+		nmdi = image.expression("(B8A - (B11 - B12)) / (B8A + (B11 + B12))", {'B8A': image.select('B8A'),
+																			  'B11': image.select('B11'),
+																			  'B12': image.select('B12')
+																			  }).rename('nmdi')
+		return ee.Image.cat([image,tndmi,tndvi,nmdi])
+import ee
+ee.Initialize()
