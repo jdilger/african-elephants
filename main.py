@@ -3,11 +3,14 @@ class base(object):
 		self.date = 123
 		self.studyArea = ee.FeatureCollection('somehwrere').geometry()
 		self.ecoregions = ee.FeatureCollection('RESOLVE/ECOREGIONS/2017')
+		self.modisFireAqua = ee.ImageCollection('MODIS/006/MYD14A2').select([0])
+		self.modisFireTerra = ee.ImageCollection('MODIS/006/MOD14A2').select([0])
 
 
 class Fire(base):
 	def __inti__(self):
 		super(Fire, self).__init__()
+
 
 	def reclassify(self, img):
 		remapped = img.remap([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 1, 1, 1, 1, 2, 3, 4]).rename(['confidence'])
@@ -26,12 +29,12 @@ class Fire(base):
 		unit of time as string (e.g. 'day','month','year') """
 		cM = sd.get('month')
 		cY = sd.get('year')
-		currentFires = getFire(cY, cM)
+		currentFires = self.getFire(cY, cM)
 
 		pD = sd.advance(step, unit)
 		pM = pD.get('month')
 		pY = pD.get('year')
-		pastFires = getFire(pY, pM)
+		pastFires = self.getFire(pY, pM)
 
 		mask = pastFires.select('binary')
 		newFires = currentFires.where(mask.eq(1), 0).selfMask()
@@ -41,9 +44,7 @@ class Fire(base):
 
 	def getFire(self, targetYear, targetMonth):
 		# Bring in MYD14/MOD14
-		modisFireAqua = ee.ImageCollection('MODIS/006/MYD14A2').select([0]);
-		modisFireTerra = ee.ImageCollection('MODIS/006/MOD14A2').select([0]);
-		modisFire = modisFireTerra.merge(modisFireAqua);
+		modisFire = self.modisFireTerra.merge(self.modisFireAqua)
 		singleMonth = modisFire.filter(ee.Filter.calendarRange(targetYear, targetYear, 'year')).filter(
 			ee.Filter.calendarRange(targetMonth, targetMonth, 'month'));
 
@@ -103,7 +104,7 @@ class Vegetation(base):
 		def monthByRegion(b):
 			a = eco.filter(ee.Filter.eq('BIOME_NUM', ee.Number(b)))
 			c = ee.Feature(region).difference(ee.Feature(a.union(1).first()))
-			return Vegetation().monthlyNDVI(m, y, ic, c.geometry())
+			return self.monthlyNDVI(m, y, ic, c.geometry())
 
 		ndviByBiome = biomes.map(monthByRegion)
 
@@ -137,28 +138,40 @@ if __name__ == "__main__":
 
 	ee.Initialize()
 	# tests
-	ic = ee.ImageCollection("LANDSAT/LC08/C01/T1_SR")
-	m = 2
-	y = 2019
+
+	ndvi_tests = False
+	fire_test = True
+	# ndvi test
+	if fire_test:
+		sd = ee.Date('2019-02-01')
+
+		t = Fire().burnOut(sd,-2,'month')
+		print(t.bandNames().getInfo())
+		pass
+	if ndvi_tests:
+
+		ic = ee.ImageCollection("LANDSAT/LC08/C01/T1_SR")
+		m = 2
+		y = 2019
 
 
-	def maskL8sr(image):
-		cloudShadowBitMask = 1 << 3;
-		cloudsBitMask = 1 << 5;
-		qa = image.select('pixel_qa');
-		mask = qa.bitwiseAnd(cloudShadowBitMask).eq(0).And(qa.bitwiseAnd(cloudsBitMask).eq(0))
-		img = image.updateMask(mask).divide(10000).select("B[0-9]*")
-		out = img.normalizedDifference(['B5','B4']).copyProperties(image, ["system:time_start"])
-		return  out
+		def maskL8sr(image):
+			cloudShadowBitMask = 1 << 3;
+			cloudsBitMask = 1 << 5;
+			qa = image.select('pixel_qa');
+			mask = qa.bitwiseAnd(cloudShadowBitMask).eq(0).And(qa.bitwiseAnd(cloudsBitMask).eq(0))
+			img = image.updateMask(mask).divide(10000).select("B[0-9]*")
+			out = img.normalizedDifference(['B5','B4']).copyProperties(image, ["system:time_start"])
+			return  out
 
 
 
-	region = ee.Geometry.Polygon([[[22.37055462536107, -19.69234130304949],
-								   [23.161822166438526, -19.675148989974225],
-								   [23.519800725057106, -18.180985057390387],
-								   [21.87293615648901, -17.80809895124535],
-								   [21.43371056179063, -19.463056253246073]]])
-	ic = ic.map(maskL8sr).filterBounds(region)
-	print(ic.size().getInfo())
-	a = Vegetation().byRegion(m, y, ic, region)
-	print(a.bandNames().getInfo())
+		region = ee.Geometry.Polygon([[[22.37055462536107, -19.69234130304949],
+									   [23.161822166438526, -19.675148989974225],
+									   [23.519800725057106, -18.180985057390387],
+									   [21.87293615648901, -17.80809895124535],
+									   [21.43371056179063, -19.463056253246073]]])
+		ic = ic.map(maskL8sr).filterBounds(region)
+		print(ic.size().getInfo())
+		a = Vegetation().byRegion(m, y, ic, region)
+		print(a.bandNames().getInfo())
