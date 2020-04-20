@@ -75,22 +75,21 @@ class Vegetation(base):
 		month_i_ic = ic.filter(ee.Filter.calendarRange(y, y, 'year'))
 
 		month_i_mean = month_i_ic.mean().rename('NDVI_mean')
-		print(month_i_mean.getInfo(), 'month_i_mean')
+
 		month_i_mean_std = month_i_mean.reduceRegion(
-			{'reducer': ee.Reducer.stdDev(), 'geometry': geometry, 'scale': 30, 'bestEffort': True, 'maxPixels': 1e13}).get(
-			'NDVI_mean')
-		print(month_i_mean_std.getInfo(),'month_i_mean_std')
+			**{'reducer': ee.Reducer.stdDev(), 'geometry': geometry, 'scale': 30, 'bestEffort': True, 'maxPixels': 1e13}).get('NDVI_mean')
+
 		baseline_ic = ic.filter(ee.Filter.calendarRange(y, y - 10, 'year'))
 		baseline_mean = baseline_ic.mean()
 
 		aandvi = month_i_mean.subtract(baseline_mean).float().rename('AANDVI')
-		print(aandvi.bandNames().getInfo(),'aandvi')
+
 		sandvi = aandvi.divide(ee.Image.constant(month_i_mean_std).float()).rename('SANDVI')
 
 		vci_min = baseline_mean.reduceRegion(
-			{'reducer': ee.Reducer.min(), 'geometry': geometry, 'scale': 30, 'bestEffort': True, 'maxPixels': 1e13})
+			**{'reducer': ee.Reducer.min(), 'geometry': geometry, 'scale': 30, 'bestEffort': True, 'maxPixels': 1e13})
 		vci_max = baseline_mean.reduceRegion(
-			{'reducer': ee.Reducer.max(), 'geometry': geometry, 'scale': 30, 'bestEffort': True, 'maxPixels': 1e13})
+			**{'reducer': ee.Reducer.max(), 'geometry': geometry, 'scale': 30, 'bestEffort': True, 'maxPixels': 1e13})
 		vci_min = ee.Image.constant(vci_min.get('nd')).float()
 		vci_max = ee.Image.constant(vci_max.get('nd')).float()
 		vci = month_i_mean.subtract(vci_min).divide(vci_max.subtract(vci_min)).rename('VCI')
