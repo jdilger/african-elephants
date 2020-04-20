@@ -96,16 +96,20 @@ class Vegetation(base):
 
 		return ee.Image.cat([month_i_mean, aandvi, sandvi, vci])
 
-	def byRegion(self, geometry):
-		biomes = ee.List(self.ecoregions.filterBounds(geometry).aggregate_array('BIOME_NUM')).distinct()
+	def byRegion(self,m,y,ic, region):
+		eco = self.ecoregions.filterBounds(region)
+		biomes = ee.List(eco.aggregate_array('BIOME_NUM')).distinct()
 
-		def monthByRegion(self, b):
-			a = self.ecoregions.filterBounds(geometry).filter(ee.Filter.eq('BIOME_NUM', ee.Number(b)))
-			c = ee.Feature(geometry).difference(ee.Feature(a.union(1).first()))
-			return monthlyNDVI(m, y, ic, c.geometry())
+		def monthByRegion(b):
+			a = eco.filter(ee.Filter.eq('BIOME_NUM', ee.Number(b)))
+			c = ee.Feature(region).difference(ee.Feature(a.union(1).first()))
+			return Vegetation().monthlyNDVI(m, y, ic, c.geometry())
 
 		ndviByBiome = biomes.map(monthByRegion)
-		return ndviByBiome
+
+		# mosaic together
+		out = ee.ImageCollection(ndviByBiome).mosaic()
+		return out
 
 
 class Water(base):
@@ -156,5 +160,5 @@ if __name__ == "__main__":
 								   [21.43371056179063, -19.463056253246073]]])
 	ic = ic.map(maskL8sr).filterBounds(region)
 	print(ic.size().getInfo())
-	a = Vegetation().monthlyNDVI(m, y, ic, region)
+	a = Vegetation().byRegion(m, y, ic, region)
 	print(a.bandNames().getInfo())
