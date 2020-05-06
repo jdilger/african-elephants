@@ -2,13 +2,21 @@ class base(object):
 	def __init__(self):
 		self.date = 123
 		self.studyArea = ee.FeatureCollection('somehwrere').geometry()
+
+		# Vegetation
 		self.ecoregions = ee.FeatureCollection('RESOLVE/ECOREGIONS/2017')
+
+		# Fire
 		self.modisFireAqua = ee.ImageCollection('MODIS/006/MYD14A2').select([0])
 		self.modisFireTerra = ee.ImageCollection('MODIS/006/MOD14A2').select([0])
 
+	def basetest(self):
+		print('calling from base')
+		return 'string from base'
+
 
 class Fire(base):
-	def __inti__(self):
+	def __init__(self):
 		super(Fire, self).__init__()
 
 
@@ -40,7 +48,10 @@ class Fire(base):
 		newFires = currentFires.where(mask.eq(1), 0).selfMask()
 		allCurrentFires = currentFires.select('binary').rename('allFires')
 
-		return newFires.addBands(allCurrentFires)
+		kernel = ee.Kernel.euclidean(100000,'meters')
+		distance = allCurrentFires.select('allFires').distance(kernel,False)
+
+		return newFires.addBands(allCurrentFires).addBands(distance)
 
 	def getFire(self, targetYear, targetMonth):
 		# Bring in MYD14/MOD14
@@ -56,7 +67,7 @@ class Fire(base):
 
 
 class Vegetation(base):
-	def __inti__(self):
+	def __init__(self):
 		super(Vegetation, self).__init__()
 
 	def monthlyNDVI(self, m, y, ic, geometry):
@@ -114,7 +125,7 @@ class Vegetation(base):
 
 
 class Water(base):
-	def __inti__(self):
+	def __init__(self):
 		super(Water, self).__init__()
 
 	def waterindicies(image):
@@ -147,6 +158,7 @@ if __name__ == "__main__":
 
 		t = Fire().burnOut(sd,-2,'month')
 		print(t.bandNames().getInfo())
+
 		pass
 	if ndvi_tests:
 
