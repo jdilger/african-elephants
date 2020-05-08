@@ -157,7 +157,7 @@ class Water(base):
 
     def wlc(self, collection, **kwargs):
         valid_kwagrs = ['startDate','endDate']
-        if kwargs.keys() not in valid_kwagrs:
+        if len(kwargs.keys()) > 0 and len([i for i in valid_kwagrs if i in kwargs]) != len(kwargs.keys()):
             return print('Only valid arguments are startDate and endDate check that all key word are correct:{}'.format(kwargs.keys()))
         sd = kwargs.get('startDate', self.startDate)
         ed = kwargs.get('endDate', self.endDate)
@@ -168,18 +168,18 @@ class Water(base):
         smap = ee.ImageCollection("NASA_USDA/HSL/SMAP_soil_moisture").select('ssm').filterDate(sd,ed).sum()
 
         img = collection.map(self.waterindicies).median()
-        img = ee.Image.cat([img,gfs,chirps,cfs,smap])
+        img = ee.Image.cat([img,gfs,chirps,cfs,smap]).set('system:time_start',sd,'sd',sd,'ed',ed)
         return img
 
     def waterindicies(self, image):
-        ndwi = image.normalizedDifference(['B3', 'B8']).rename('ndwi')
-        ndmi = image.normalizedDifference(['B8', 'B11']).rename('ndmi')
-        mndwi = image.normalizedDifference(['B3', 'B11']).rename('mndwi')
+        ndwi = image.normalizedDifference(['green', 'nir']).rename('ndwi')
+        ndmi = image.normalizedDifference(['nir', 'swir1']).rename('ndmi')
+        mndwi = image.normalizedDifference(['green', 'swir1']).rename('mndwi')
         nwi = image.expression('((b-(n+s+w))/(b+(n+s+w))*100)', {
-            'b': image.select('B2'),
-            'n': image.select('B8'),
-            's': image.select('B11'),
-            'w': image.select('B12')}).rename('nwi-wet')
+            'b': image.select('blue'),
+            'n': image.select('nir'),
+            's': image.select('swir1'),
+            'w': image.select('swir2')}).rename('nwi-wet')
         # add tesselcap wetness
 
         # var factors = ee.ImageCollection.fromImages([waterlss2.select('mndwi'),chirps_spi,smap,mndwi,nwi,ndmi,gfs,ndwi]).map(function(f){ return n(f,aoi)})
@@ -686,12 +686,24 @@ if __name__ == "__main__":
     water_tests = True
     if water_tests:
         t = sentinel2().preprocess().select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2'])
-        Water().wlc(t,supDate=111)
-        # try:
-        #     t = sentinel2().preprocess().select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2'])
-        #     Water().wlc(t)
-        # except:
-        #     print('fucking pycharm')
+        try:
+            str == Water().wlc(t,supDate=111)
+            print('passes wrong kwargs')
+        except:
+            print('passes wrong kwargs')
+        try:
+            Water().wlc(t).bandNames().getInfo()
+            print('passes wlc with defaults')
+        except:
+            print('wlc fails with defaults')
+        try:
+            sd = ee.Date('2018-01-01')
+            ed = ee.Date('2018-03-01')
+            img = Water().wlc(t,startDate=sd,endDate=ed)
+            sd.getInfo()['value'] == img.get('sd').getInfo()['value']
+            print('passes useing custom date')
+        except:
+            print('failed to use correct date')
     if collection_test:
         try:
             t = sentinel2().preprocess().select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2'])
