@@ -170,7 +170,8 @@ class Water(base):
         img = collection.map(self.waterindicies).median()
         img = ee.Image.cat([img,gfs,chirps,cfs,smap]).set('system:time_start',sd,'sd',sd,'ed',ed)
         return img
-
+    def wlcexpression(self,img):
+        pass
     def waterindicies(self, image):
         ndwi = image.normalizedDifference(['green', 'nir']).rename('ndwi')
         ndmi = image.normalizedDifference(['nir', 'swir1']).rename('ndmi')
@@ -682,8 +683,8 @@ if __name__ == "__main__":
 
     ndvi_tests = False
     fire_test = False
-    collection_test = False
-    water_tests = True
+    collection_test = True
+    water_tests = False
     if water_tests:
         t = sentinel2().preprocess().select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2'])
         try:
@@ -707,11 +708,18 @@ if __name__ == "__main__":
     if collection_test:
         try:
             t = sentinel2().preprocess().select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2'])
-            print(t.first().bandNames().getInfo(), t.size().getInfo())
             t2 = landsat().preprocess().select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2'])
-            print(t2.first().bandNames().getInfo(), t2.size().getInfo())
+            t2.first().bandNames().getInfo() == t.first().bandNames().getInfo()
+            print('passed loading collections')
         except:
-            print('something went wrong')
+            print('failed loading collections')
+        try:
+            t = sentinel2().preprocess().select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2'])
+            t2 = landsat().preprocess().select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2'])
+            merged_img = t.merge(t2).min()
+            print('passed merging collections')
+        except:
+            print('failed merging collections')
 
     if fire_test:
         sd = ee.Date('2019-02-01')
