@@ -1,5 +1,8 @@
+import ee
+from utils import *
 class base(object):
     def __init__(self):
+
         self.date = 123
         self.studyArea = ee.FeatureCollection('somehwrere').geometry()
 
@@ -166,12 +169,25 @@ class Water(base):
         chirps = ee.ImageCollection("UCSB-CHG/CHIRPS/PENTAD").filterBounds(self.studyArea).filterDate(ee.Date(sd),ee.Date(ed)).sum()
         cfs = ee.ImageCollection('NOAA/CFSV2/FOR6H').select(['Precipitation_rate_surface_6_Hour_Average'],['precip']).filterDate(sd,ed).filterBounds(self.studyArea).sum()
         smap = ee.ImageCollection("NASA_USDA/HSL/SMAP_soil_moisture").select('ssm').filterDate(sd,ed).sum()
+        chirps_spi = self.spi(ee.ImageCollection("UCSB-CHG/CHIRPS/PENTAD").filterBounds(self.studyArea),sd,ed).rename('chirps_spi')
 
         img = collection.map(self.waterindicies).median()
-        img = ee.Image.cat([img,gfs,chirps,cfs,smap]).set('system:time_start',sd,'sd',sd,'ed',ed)
+        img = ee.Image.cat([img,gfs,chirps,cfs,smap,chirps_spi]).set('system:time_start',sd,'sd',sd,'ed',ed)
         return img
-    def wlcexpression(self,img):
-        pass
+    def wlcexpression(self,img,region):
+        # imgBands = img.bandNames().getInfo()
+        #
+        # em =[]
+        # eeem = ee.List([])
+        # for i in imgBands:
+        #     print(i)
+        #     t = Water().linearScale(img.select(i),region)
+        #     # em.append(t)
+        #     eeem=eeem.add(t)
+        # img = ee.Image.cat(eeem)
+        # print(img.bandNames().getInfo())
+
+        return 1
     def waterindicies(self, image):
         ndwi = image.normalizedDifference(['green', 'nir']).rename('ndwi')
         ndmi = image.normalizedDifference(['nir', 'swir1']).rename('ndmi')
@@ -182,9 +198,43 @@ class Water(base):
             's': image.select('swir1'),
             'w': image.select('swir2')}).rename('nwi-wet')
         # add tesselcap wetness
-
+        tcw = image.expression('0.1511*B1 + 0.1973*B2 + 0.3283*B3 + 0.3407*B4 + -0.7117*B5 + -0.4559*B7', {
+            'B1': image.select('blue'),
+            'B2': image.select('green'),
+            'B3': image.select('red'),
+            'B4': image.select('nir'),
+            'B5': image.select('swir1'),
+            'B7': image.select('swir2'),
+        }).rename('tcw')
         # var factors = ee.ImageCollection.fromImages([waterlss2.select('mndwi'),chirps_spi,smap,mndwi,nwi,ndmi,gfs,ndwi]).map(function(f){ return n(f,aoi)})
-        return ee.Image.cat([ndwi, ndmi, mndwi, nwi])
+        imglist = [ndwi, ndmi, mndwi, nwi, tcw]
+
+        return ee.Image.cat(imglist)
+
+    def spi(self, col, sd, ed):
+        nsd = sd.advance(-6, 'month')
+
+        spi6 = col.filterDate(nsd, sd)
+
+        mean = spi6.mean()
+
+        std = spi6.reduce(ee.Reducer.stdDev())
+
+
+        img = col.filterDate(sd, ed).median()
+        img = img.subtract(mean).divide(std).set('system:time_start', sd)
+        return ee.Image(img)
+
+    def linearScale(self, img, region):
+        img = ee.Image(img)
+
+        bn = img.bandNames()
+        scale = img.projection().nominalScale()
+        imgMinMax = img.reduceRegion(**{'reducer': ee.Reducer.minMax(), 'scale': scale, 'geometry': region, 'maxPixels': 1e13})
+        imgMin = ee.Image.constant(imgMinMax.get(imgMinMax.keys().get(1)))
+        imgMax = ee.Image.constant(imgMinMax.get(imgMinMax.keys().get(0)))
+        normImg = img.subtract(imgMin).divide(imgMax.subtract(imgMin))
+        return normImg.toFloat().rename(bn)
 
 class landsat(base):
     def __init__(self):
@@ -197,26 +247,33 @@ class landsat(base):
                                                       'L5': ee.List([0, 1, 2, 3, 4, 5, 6, 7, 9]), \
                                                       'L4': ee.List([0, 1, 2, 3, 4, 5, 6, 7, 9])})
 
-    def loadls(self):
-        landsat8 = ee.ImageCollection('LANDSAT/LC08/C01/T1_SR').filterDate(self.startDate,
-                                                                           self.endDate).filterBounds(self.studyArea)
+    def loadls(self,startDate,endDate):
+        landsat8 = ee.ImageCollection('LANDSAT/LC08/C01/T1_TOA').filterDate(startDate,
+                                                                           endDate).filterBounds(self.studyArea)
         landsat8 = landsat8.filterMetadata('CLOUD_COVER', 'less_than', self.metadataCloudCoverMax)
         landsat8 = landsat8.select(self.sensorBandDictLandsatSR.get('L8'), self.bandNamesLandsat)
 
-        landsat5 = ee.ImageCollection('LANDSAT/LT05/C01/T1_SR').filterDate(self.startDate,
-                                                                           self.endDate).filterBounds(self.studyArea)
+        landsat5 = ee.ImageCollection('LANDSAT/LT05/C01/T1_TOA').filterDate(startDate,
+                                                                           endDate).filterBounds(self.studyArea)
         landsat5 = landsat5.filterMetadata('CLOUD_COVER', 'less_than', self.metadataCloudCoverMax)
         landsat5 = landsat5.select(self.sensorBandDictLandsatSR.get('L5'), self.bandNamesLandsat).map(
             self.defringe)
 
-        landsat7 = ee.ImageCollection('LANDSAT/LE07/C01/T1_SR').filterDate(self.startDate,
-                                                                           self.endDate).filterBounds(self.studyArea)
+        landsat7 = ee.ImageCollection('LANDSAT/LE07/C01/T1_TOA').filterDate(startDate,
+                                                                           endDate).filterBounds(self.studyArea)
         landsat7 = landsat7.filterMetadata('CLOUD_COVER', 'less_than', self.metadataCloudCoverMax)
         landsat7 = landsat7.select(self.sensorBandDictLandsatSR.get('L7'), self.bandNamesLandsat)
 
         return landsat5.merge(landsat7).merge(landsat8)
-    def preprocess(self):
-        landsat = self.loadls()
+    def preprocess(self, **kwargs):
+        valid_kwagrs = ['startDate','endDate']
+        if len(kwargs.keys()) > 0 and len([i for i in valid_kwagrs if i in kwargs]) != len(kwargs.keys()):
+            return print('Only valid arguments are startDate and endDate check that all key word are correct:{}'.format(kwargs.keys()))
+
+        startDate = kwargs.get('startDate', self.startDate)
+        endDate = kwargs.get('endDate', self.endDate)
+
+        landsat = self.loadls(startDate=startDate,endDate=endDate)
         if landsat.size().getInfo() > 0:
             if self.maskSR == True:
                 print("removing clouds")
@@ -471,7 +528,7 @@ class sentinel2(base):
         self.dilatePixels = 3.5
 
     def loads2(self, start, end, studyArea):
-        s2s = ee.ImageCollection('COPERNICUS/S2_SR').filterDate(start, end) \
+        s2s = ee.ImageCollection('COPERNICUS/S2').filterDate(start, end) \
                 .filterBounds(studyArea) \
                 .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', self.metadataCloudCoverMax)) \
                 .filter(ee.Filter.lt('CLOUD_COVERAGE_ASSESSMENT', self.metadataCloudCoverMax)) \
@@ -479,8 +536,15 @@ class sentinel2(base):
         return s2s
 
 
-    def preprocess(self):
-        s2 = self.loads2(self.startDate, self.endDate, self.studyArea)
+    def preprocess(self, **kwargs):
+        valid_kwagrs = ['startDate','endDate','studyArea']
+        if len(kwargs.keys()) > 0 and len([i for i in valid_kwagrs if i in kwargs]) != len(kwargs.keys()):
+            return print('Only valid arguments are startDate and endDate check that all key word are correct:{}'.format(kwargs.keys()))
+
+        startDate = kwargs.get('startDate', self.startDate)
+        endDate = kwargs.get('endDate', self.endDate)
+        studyArea =  kwargs.get('studyArea', self.studyArea)
+        s2 = self.loads2(startDate, endDate, studyArea)
 
         if s2.size().getInfo() > 0:
             s2 = s2.map(self.scaleS2)
@@ -675,36 +739,55 @@ class sentinel2(base):
         return img.addBands(score.rename(['cloudScore']))
 
 if __name__ == "__main__":
-    from utils import *
-    import ee
+
+
 
     ee.Initialize()
     # tests
 
     ndvi_tests = False
     fire_test = False
-    collection_test = True
-    water_tests = False
+    collection_test = False
+    water_tests = True
     if water_tests:
         t = sentinel2().preprocess().select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2'])
+        g = Water().wlc(t)
+        wtf = Water().linearScale(g.select([0]), base().studyArea)
+        print('ok')
+        b = Water().wlcexpression(g, base().studyArea)
+        # try:
+        #     img = Water().wlc(t)
+        #
+        #     b = Water().wlcexpression(img, base().studyArea)
+        # except:
+        #     print('fml')
+        # try:
+        #     str == Water().wlc(t,supDate=111)
+        #     print('passes wrong kwargs')
+        # except:
+        #     print('fails wrong kwargs')
         try:
-            str == Water().wlc(t,supDate=111)
-            print('passes wrong kwargs')
-        except:
-            print('passes wrong kwargs')
-        try:
-            Water().wlc(t).bandNames().getInfo()
+            print(Water().wlc(t).bandNames().getInfo())
+
             print('passes wlc with defaults')
         except:
             print('wlc fails with defaults')
+        # try:
+        #     sd = ee.Date('2018-01-01')
+        #     ed = ee.Date('2018-03-01')
+        #     img = Water().wlc(t,startDate=sd,endDate=ed)
+        #     sd.getInfo()['value'] == img.get('sd').getInfo()['value']
+        #     print('passes useing custom date')
+        # except:
+        #     print('failed to use correct date')
         try:
-            sd = ee.Date('2018-01-01')
-            ed = ee.Date('2018-03-01')
-            img = Water().wlc(t,startDate=sd,endDate=ed)
-            sd.getInfo()['value'] == img.get('sd').getInfo()['value']
-            print('passes useing custom date')
+            g = Water().wlc(t)
+            wtf = Water().linearScale(g.select([0]), base().studyArea)
+            print('ok')
         except:
-            print('failed to use correct date')
+            print('failed')
+
+
     if collection_test:
         try:
             t = sentinel2().preprocess().select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2'])
