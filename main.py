@@ -164,8 +164,20 @@ class Water(base):
             return print('Only valid arguments are startDate and endDate check that all key word are correct:{}'.format(kwargs.keys()))
         sd = kwargs.get('startDate', self.startDate)
         ed = kwargs.get('endDate', self.endDate)
+        def forecastscleaning(img):
+            chour = ee.Date(img.get('creation_time')).get('hour')
+            fhour = ee.Date(img.get('forecast_time')).get('hour')
+            fday = ee.Date(img.get('forecast_time')).get('day')
+            cday = ee.Date(img.get('creation_time')).get('day')
+            eq = cday.eq(fday)
+            return img.set('fhour', fhour, 'chour', chour, 'fday', fday, 'cday', cday, 'test', eq)
 
-        gfs = ee.ImageCollection("NOAA/GFS0P25").select(['temperature_2m_above_ground']).filterDate(sd, ed).filterBounds(self.studyArea).filter(ee.Filter.eq("forecast_hours", 12)).median()
+        gfs = ee.ImageCollection("NOAA/GFS0P25").select(['temperature_2m_above_ground']).filterDate(sd, ed)\
+            .filter(ee.Filter.calendarRange(12, 12, 'hour')).map(forecastscleaning) \
+            .filter(ee.Filter.eq('fhour', 12))\
+            .filter(ee.Filter.eq('chour', 12))\
+            .filter(ee.Filter.eq('test', 1)).median()
+        
         chirps = ee.ImageCollection("UCSB-CHG/CHIRPS/PENTAD").filterBounds(self.studyArea).filterDate(ee.Date(sd),ee.Date(ed)).sum()
         cfs = ee.ImageCollection('NOAA/CFSV2/FOR6H').select(['Precipitation_rate_surface_6_Hour_Average'],['precip']).filterDate(sd,ed).filterBounds(self.studyArea).sum()
         smap = ee.ImageCollection("NASA_USDA/HSL/SMAP_soil_moisture").select('ssm').filterDate(sd,ed).sum()
