@@ -79,9 +79,9 @@ class Fire(base):
         allCurrentFires = currentFires.select('binary').rename('allFires')
 
         kernel = ee.Kernel.euclidean(100000,'meters')
-        distance = allCurrentFires.select('allFires').distance(kernel,False)
+        distance = allCurrentFires.select('allFires').distance(kernel,False).rename('distance10k')
 
-        return newFires.addBands(allCurrentFires).addBands(distance)
+        return newFires.addBands(allCurrentFires).addBands(pastFires.select(['binary'],['past'])).addBands(distance)
 
     def getFire(self, targetYear, targetMonth):
         # Bring in MYD14/MOD14
@@ -820,8 +820,8 @@ if __name__ == "__main__":
     # tests
 
     ndvi_tests = False
-    fire_test = False
-    collection_test = True
+    fire_test = True
+    collection_test = False
     water_tests = False
     if water_tests:
         t = sentinel2().preprocess().select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2'])
