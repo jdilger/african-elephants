@@ -177,7 +177,7 @@ class Water(base):
             .filter(ee.Filter.eq('fhour', 12))\
             .filter(ee.Filter.eq('chour', 12))\
             .filter(ee.Filter.eq('test', 1)).median()
-        
+
         chirps = ee.ImageCollection("UCSB-CHG/CHIRPS/PENTAD").filterBounds(self.studyArea).filterDate(ee.Date(sd),ee.Date(ed)).sum()
         cfs = ee.ImageCollection('NOAA/CFSV2/FOR6H').select(['Precipitation_rate_surface_6_Hour_Average'],['precip']).filterDate(sd,ed).filterBounds(self.studyArea).sum()
         smap = ee.ImageCollection("NASA_USDA/HSL/SMAP_soil_moisture").select('ssm').filterDate(sd,ed).sum()
@@ -522,12 +522,13 @@ class sentinel2(base):
     def __init__(self):
         super(sentinel2, self).__init__()
         self.s2BandsIn = ee.List(
-            ['QA60', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9', 'B11', 'B12'])
+            ['QA60', 'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9', 'B10', 'B11', 'B12'])
         self.s2BandsOut = ee.List(
-            ['QA60', 'cb', 'blue', 'green', 'red', 're1', 're2', 're3', 'nir', 're4', 'waterVapor', 'swir1',
+            ['QA60', 'cb', 'blue', 'green', 'red', 're1', 're2', 're3', 'nir', 're4', 'waterVapor', 'cirrus','swir1',
              'swir2'])
         self.divideBands = ee.List(
-            ['blue', 'green', 'red', 're1', 're2', 're3', 'nir', 're4', 'cb', 'swir1', 'swir2', 'waterVapor'])
+            ['blue', 'green', 'red', 're1', 're2', 're3', 'nir', 're4', 'cb', 'cirrus','swir1', 'swir2', 'waterVapor'])
+
         # contractPixels: The radius of the number of pixels to contract (negative buffer) clouds and cloud shadows by. Intended to eliminate smaller cloud
         #    patches that are likely errors (1.5 results in a -1 pixel buffer)(0.5 results in a -0 pixel buffer)
         # (1.5 or 2.5 generally is sufficient)
@@ -567,10 +568,10 @@ class sentinel2(base):
                 print("use QA band for cloud Masking")
                 s2 = s2.map(self.QAMaskCloud)
 
-            # if self.cloudMask == True:
-            #     print("sentinel cloud score...")
-            #     s2 = s2.map(self.sentinelCloudScore)
-            #     s2 = self.cloudMasking(s2)
+            if self.cloudMask == True:
+                print("sentinel cloud score...")
+                s2 = s2.map(self.sentinelCloudScore)
+                s2 = self.cloudMasking(s2)
 
             if self.brdfCorrect == True:
                 print("apply brdf correction..")
@@ -588,6 +589,67 @@ class sentinel2(base):
         return out.addBands(others).copyProperties(img,
                                                    ['system:time_start', 'system:footprint', 'MEAN_SOLAR_ZENITH_ANGLE',
                                                     'MEAN_SOLAR_AZIMUTH_ANGLE']).set("centroid", img.geometry().centroid())
+
+    def sentinelCloudScore(self, img):
+        """
+        Computes spectral indices of cloudyness and take the minimum of them.
+
+        Each spectral index is fairly lenient because the group minimum
+        is a somewhat stringent comparison policy. side note -> this seems like a job for machine learning :)
+
+        originally written by Matt Hancher for Landsat imagery
+        adapted to Sentinel by Chris Hewig and Ian Housman
+        """
+
+        def rescale(img, thresholds):
+            """
+            Linear stretch of image between two threshold values.
+            """
+            return img.subtract(thresholds[0]).divide(thresholds[1] - thresholds[0])
+
+        # cloud until proven otherwise
+        score = ee.Image(1)
+        blueCirrusScore = ee.Image(0)
+
+        # clouds are reasonably bright
+        blueCirrusScore = blueCirrusScore.max(rescale(img.select(['blue']), [0.1, 0.5]))
+        blueCirrusScore = blueCirrusScore.max(rescale(img.select(['cb']), [0.1, 0.5]))
+        blueCirrusScore = blueCirrusScore.max(rescale(img.select(['cirrus']), [0.1, 0.3]))
+        score = score.min(blueCirrusScore)
+
+        score = score.min(rescale(img.select(['red']).add(img.select(['green'])).add(img.select('blue')), [0.2, 0.8]))
+        score = score.min(rescale(img.select(['nir']).add(img.select(['swir1'])).add(img.select('swir2')), [0.3, 0.8]))
+
+        # clouds are moist
+        ndsi = img.normalizedDifference(['green', 'swir1'])
+        score = score.min(rescale(ndsi, [0.8, 0.6]))
+        score = score.multiply(100).byte();
+        score = score.clamp(0, 100);
+
+        return img.addBands(score.rename(['cloudScore']))
+
+    def cloudMasking(self, collection):
+
+        def maskClouds(img):
+            cloudMask = img.select(['cloudScore']).lt(self.cloudScoreThresh) \
+                .focal_min(self.dilatePixels) \
+                .focal_max(self.contractPixels) \
+                .rename(['cloudMask'])
+
+            bandNames = img.bandNames()
+            otherBands = bandNames.removeAll(self.divideBands)
+            others = img.select(otherBands)
+
+            img = img.select(self.divideBands).updateMask(cloudMask)
+
+            return img.addBands(cloudMask).addBands(others);
+
+        # Find low cloud score pctl for each pixel to avoid comission errors
+        #minCloudScore = collection.select(['cloudScore']).reduce(ee.Reducer.percentile([self.cloudScorePctl]));
+
+        collection = collection.map(maskClouds)
+
+        return collection
 
     def QAMaskCloud(self, img):
         bandNames = img.bandNames()
@@ -759,39 +821,39 @@ if __name__ == "__main__":
 
     ndvi_tests = False
     fire_test = False
-    collection_test = False
-    water_tests = True
+    collection_test = True
+    water_tests = False
     if water_tests:
         t = sentinel2().preprocess().select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2'])
         g = Water().wlc(t)
         wtf = Water().linearScale(g.select([0]), base().studyArea)
         print('ok')
         b = Water().wlcexpression(g, base().studyArea)
-        # try:
-        #     img = Water().wlc(t)
-        #
-        #     b = Water().wlcexpression(img, base().studyArea)
-        # except:
-        #     print('fml')
-        # try:
-        #     str == Water().wlc(t,supDate=111)
-        #     print('passes wrong kwargs')
-        # except:
-        #     print('fails wrong kwargs')
+        try:
+            img = Water().wlc(t)
+
+            b = Water().wlcexpression(img, base().studyArea)
+        except:
+            print('fml')
+        try:
+            str == Water().wlc(t,supDate=111)
+            print('passes wrong kwargs')
+        except:
+            print('fails wrong kwargs')
         try:
             print(Water().wlc(t).bandNames().getInfo())
 
             print('passes wlc with defaults')
         except:
             print('wlc fails with defaults')
-        # try:
-        #     sd = ee.Date('2018-01-01')
-        #     ed = ee.Date('2018-03-01')
-        #     img = Water().wlc(t,startDate=sd,endDate=ed)
-        #     sd.getInfo()['value'] == img.get('sd').getInfo()['value']
-        #     print('passes useing custom date')
-        # except:
-        #     print('failed to use correct date')
+        try:
+            sd = ee.Date('2018-01-01')
+            ed = ee.Date('2018-03-01')
+            img = Water().wlc(t,startDate=sd,endDate=ed)
+            sd.getInfo()['value'] == img.get('sd').getInfo()['value']
+            print('passes useing custom date')
+        except:
+            print('failed to use correct date')
         try:
             g = Water().wlc(t)
             wtf = Water().linearScale(g.select([0]), base().studyArea)
