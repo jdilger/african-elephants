@@ -28,7 +28,7 @@ class base(object):
         self.cloudMask = True
         self.brdfCorrect = False
         self.shadowMasking = False
-        self.cloudScoreThresh = 30
+        self.cloudScoreThresh = 20
 
         self.toaOrSR = False
 
@@ -107,7 +107,7 @@ class Fire(base):
         # Bring in MYD14/MOD14
         modisFire = self.modisFireTerra.merge(self.modisFireAqua)
         singleMonth = modisFire.filter(ee.Filter.calendarRange(targetYear, targetYear, 'year')).filter(
-            ee.Filter.calendarRange(targetMonth, targetMonth, 'month'));
+            ee.Filter.calendarRange(targetMonth, targetMonth, 'month'))
 
         # Recode it, and find the year, month, and day- then add it to the map
         singleMonth = singleMonth.map(self.reclassify);
