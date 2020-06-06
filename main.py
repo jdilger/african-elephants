@@ -33,11 +33,6 @@ class base(object):
         self.toaOrSR = False
 
     def exportMap(self, img, desc, region):
-        # geom = studyArea.getInfo();
-        # sd = str(self.startDate.getRelative('day', 'year').add(1).getInfo()).zfill(3);
-        # ed = str(self.endDate.getRelative('day', 'year').add(1).getInfo()).zfill(3);
-        # year = str(self.startDate.get('year').getInfo());
-        # regionName = self.regionName.replace(" ", '_') + "_"
 
         task_ordered = ee.batch.Export.image.toAsset(image=img,
                                                      description=desc,
@@ -46,6 +41,27 @@ class base(object):
                                                      maxPixels=1e13,
                                                      # crs=self.epsg,
                                                      scale=20)
+
+        task_ordered.start()
+
+    def exportMapToCloud(self, img, desc, region,bucket,**kwargs):
+
+        scale = kwargs.get('scale', 20)
+        prefix = kwargs.get('prefix',None)
+
+        if prefix:
+            fileNamePrefix = %s/%s" % (prefix,desc)
+        else:
+            fileNamePrefix = desc
+
+        task_ordered = ee.batch.Export.image.toCloudStorage(image=img,
+                                                     description=desc,
+                                                     bucket=bucket,
+                                                     fileNamePrefix=fileNamePrefix,
+                                                     region=region.getInfo()['coordinates'],
+                                                     maxPixels=1e13,
+                                                     # crs=self.epsg,
+                                                     scale=scale)
 
         task_ordered.start()
 
