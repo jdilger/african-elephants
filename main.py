@@ -883,10 +883,10 @@ if __name__ == "__main__":
     ee.Initialize()
     # tests
 
-    ndvi_tests = False
+    ndvi_tests = True
     fire_test = False
     collection_test = False
-    water_tests = True
+    water_tests = False
 
     region = ee.Geometry.Polygon([[[22.37055462536107, -19.69234130304949],
                                    [23.161822166438526, -19.675148989974225],
@@ -1002,3 +1002,10 @@ if __name__ == "__main__":
         print(ic.size().getInfo())
         a = Vegetation().byRegion(m, y, ic, region)
         print(a.bandNames().getInfo())
+        try:
+            t2 = landsat().preprocess().select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2'])
+            v = Vegetation().byRegion(m,y,t2,region)
+            print(v.bandNames().getInfo())
+        except Exception as e:
+            print('failed using ls collection')
+            print(e.args)
