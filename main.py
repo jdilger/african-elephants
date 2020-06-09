@@ -302,18 +302,18 @@ class landsat(base):
                                                       'L4': ee.List([0, 1, 2, 3, 4, 5, 6, 7, 9])})
 
     def loadls(self, startDate, endDate, studyArea):
-        landsat8 = ee.ImageCollection('LANDSAT/LC08/C01/T1_TOA').filterDate(startDate,
+        landsat8 = ee.ImageCollection('LANDSAT/LC08/C01/T1_SR').filterDate(startDate,
                                                                             endDate).filterBounds(studyArea)
         landsat8 = landsat8.filterMetadata('CLOUD_COVER', 'less_than', self.metadataCloudCoverMax)
         landsat8 = landsat8.select(self.sensorBandDictLandsatSR.get('L8'), self.bandNamesLandsat)
 
-        landsat5 = ee.ImageCollection('LANDSAT/LT05/C01/T1_TOA').filterDate(startDate,
+        landsat5 = ee.ImageCollection('LANDSAT/LT05/C01/T1_SR').filterDate(startDate,
                                                                             endDate).filterBounds(studyArea)
         landsat5 = landsat5.filterMetadata('CLOUD_COVER', 'less_than', self.metadataCloudCoverMax)
         landsat5 = landsat5.select(self.sensorBandDictLandsatSR.get('L5'), self.bandNamesLandsat).map(
             self.defringe)
 
-        landsat7 = ee.ImageCollection('LANDSAT/LE07/C01/T1_TOA').filterDate(startDate,
+        landsat7 = ee.ImageCollection('LANDSAT/LE07/C01/T1_SR').filterDate(startDate,
                                                                             endDate).filterBounds(studyArea)
         landsat7 = landsat7.filterMetadata('CLOUD_COVER', 'less_than', self.metadataCloudCoverMax)
         landsat7 = landsat7.select(self.sensorBandDictLandsatSR.get('L7'), self.bandNamesLandsat)
