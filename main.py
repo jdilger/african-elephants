@@ -301,35 +301,36 @@ class landsat(base):
                                                       'L5': ee.List([0, 1, 2, 3, 4, 5, 6, 7, 9]), \
                                                       'L4': ee.List([0, 1, 2, 3, 4, 5, 6, 7, 9])})
 
-    def loadls(self, startDate, endDate):
+    def loadls(self, startDate, endDate, studyArea):
         landsat8 = ee.ImageCollection('LANDSAT/LC08/C01/T1_TOA').filterDate(startDate,
-                                                                            endDate).filterBounds(self.studyArea)
+                                                                            endDate).filterBounds(studyArea)
         landsat8 = landsat8.filterMetadata('CLOUD_COVER', 'less_than', self.metadataCloudCoverMax)
         landsat8 = landsat8.select(self.sensorBandDictLandsatSR.get('L8'), self.bandNamesLandsat)
 
         landsat5 = ee.ImageCollection('LANDSAT/LT05/C01/T1_TOA').filterDate(startDate,
-                                                                            endDate).filterBounds(self.studyArea)
+                                                                            endDate).filterBounds(studyArea)
         landsat5 = landsat5.filterMetadata('CLOUD_COVER', 'less_than', self.metadataCloudCoverMax)
         landsat5 = landsat5.select(self.sensorBandDictLandsatSR.get('L5'), self.bandNamesLandsat).map(
             self.defringe)
 
         landsat7 = ee.ImageCollection('LANDSAT/LE07/C01/T1_TOA').filterDate(startDate,
-                                                                            endDate).filterBounds(self.studyArea)
+                                                                            endDate).filterBounds(studyArea)
         landsat7 = landsat7.filterMetadata('CLOUD_COVER', 'less_than', self.metadataCloudCoverMax)
         landsat7 = landsat7.select(self.sensorBandDictLandsatSR.get('L7'), self.bandNamesLandsat)
 
         return landsat5.merge(landsat7).merge(landsat8)
 
     def preprocess(self, **kwargs):
-        valid_kwagrs = ['startDate', 'endDate']
+        valid_kwagrs = ['startDate', 'endDate','studyArea']
         if len(kwargs.keys()) > 0 and len([i for i in valid_kwagrs if i in kwargs]) != len(kwargs.keys()):
-            return print('Only valid arguments are startDate and endDate check that all key word are correct:{}'.format(
+            return print('Only valid arguments are startDate, studyArea, and endDate check that all key word are correct:{}'.format(
                 kwargs.keys()))
 
         startDate = kwargs.get('startDate', self.startDate)
         endDate = kwargs.get('endDate', self.endDate)
+        studyArea = kwargs.get('studyArea',self.studyArea)
 
-        landsat = self.loadls(startDate=startDate, endDate=endDate)
+        landsat = self.loadls(startDate=startDate, endDate=endDate, studyArea=studyArea)
         if landsat.size().getInfo() > 0:
             if self.maskSR == True:
                 print("removing clouds")
