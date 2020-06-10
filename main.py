@@ -32,15 +32,16 @@ class base(object):
 
         self.toaOrSR = False
 
-    def exportMap(self, img, desc, region):
+    def exportMapToAsset(self, img, desc, region, assetbase, **kwargs):
+        scale = kwargs.get('scale', 20)
 
         task_ordered = ee.batch.Export.image.toAsset(image=img,
                                                      description=desc,
-                                                     assetId='users/TEST/%s' % (desc),
+                                                     assetId='%s/%s' % (assetbase,desc),
                                                      region=region.getInfo()['coordinates'],
                                                      maxPixels=1e13,
                                                      # crs=self.epsg,
-                                                     scale=20)
+                                                     scale=scale)
 
         task_ordered.start()
 
