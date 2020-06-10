@@ -68,6 +68,7 @@ class base(object):
 
 
 class Fire(base):
+    # todo: add check for no fires in current/previous months
     def __init__(self):
         super(Fire, self).__init__()
 
@@ -97,6 +98,7 @@ class Fire(base):
 
         mask = pastFires.select('binary')
         newFires = currentFires.where(mask.eq(1), 0).selfMask()
+        print(currentFires.bandNames().getInfo(),'mask fire')
         allCurrentFires = currentFires.select('binary').rename('allFires')
 
         kernel = ee.Kernel.euclidean(100000, 'meters')
@@ -109,7 +111,7 @@ class Fire(base):
         modisFire = self.modisFireTerra.merge(self.modisFireAqua)
         singleMonth = modisFire.filter(ee.Filter.calendarRange(targetYear, targetYear, 'year')).filter(
             ee.Filter.calendarRange(targetMonth, targetMonth, 'month'))
-
+        print(singleMonth.size().getInfo())
         # Recode it, and find the year, month, and day- then add it to the map
         singleMonth = singleMonth.map(self.reclassify);
         sum_denisty = singleMonth.select('binary').sum().rename('denisty')
