@@ -3,7 +3,8 @@ import ee
 import main
 import datetime
 ee.Initialize()
-
+# paramters for fire as burn
+# paramters for ndvi anomallies
 # TODO change sd/ed to pull current data
 py_date = datetime.datetime.utcnow()
 
@@ -22,6 +23,8 @@ region = ee.Geometry.Polygon([[[22.37055462536107, -19.69234130304949],
 # Fire products
 # todo: when check added for 0 fires (current/previous) update ed
 fire = main.Fire().burnOut(ed.advance(-1,'month'), -2, 'month').toInt16()
+historyFireStartdate = sd.advance(-6,'months')
+historyFire = main.Fire().historyFire(historyFireStartdate,ed)
 
 # Vegetation products
 def nd(image):
@@ -42,9 +45,9 @@ water = main.Water().wlcexpression(img, region)
 # # export to cloud
 # main.base().exportMapToCloud(water,'watertest',region,'goldminehack',prefix='wwfWater')
 # main.base().exportMapToCloud(vegetation,'vegetationtest',region,'goldminehack',prefix='wwfVegetation',scale=30)
-# main.base().exportMapToCloud(fire,'firetest',region,'goldminehack',prefix='wwfFire',scale=500)
+main.base().exportMapToCloud(fire,'firetest',region,'wwf-gee-bucket',prefix='wwfFire',scale=500)
 # export to asset
 assetbase = "users/TEST"
 # main.base().exportMapToAsset(water,'watertestass',region,assetbase)
 # main.base().exportMapToAsset(vegetation,'vegetationtestass',region,assetbase,scale=30)
-main.base().exportMapToAsset(fire,'firetestass',region,assetbase,scale=500)
+# main.base().exportMapToAsset(fire,'firetestass',region,assetbase,scale=500)
