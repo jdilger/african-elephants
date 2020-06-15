@@ -76,10 +76,11 @@ class Fire(base):
         remapped = img.remap([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 1, 1, 1, 1, 2, 3, 4]).rename(['confidence'])
         d = ee.Date(img.get('system:time_start'))
         y = ee.Image(d.get('year')).int16().rename(['year'])
-        m = ee.Image(d.get('month')).int16().rename(['month']);
+        m = ee.Image(d.get('month')).int16().rename(['month'])
+        unix = ee.Image(d.millis()).long().rename('unix')
         day = ee.Image(d.get('day')).int16().rename(['day']);
         binary = remapped.select('confidence').gte(2).rename('binary')
-        out = remapped.addBands(y).addBands(m).addBands(day).addBands(binary);
+        out = remapped.addBands(y).addBands(m).addBands(day).addBands(binary).addBands(unix)
         out = out.updateMask(remapped.gte(2));
 
         return out
@@ -106,12 +107,21 @@ class Fire(base):
 
         return newFires.addBands(allCurrentFires).addBands(pastFires.select(['binary'], ['past'])).addBands(distance)
 
+    def historyFire(self,startDate,endDate):
+        modisFire = self.modisFireTerra.merge(self.modisFireAqua)
+        modisFire = modisFire.filterDate(startDate,endDate)
+        fire = modisFire.map(self.reclassify).select('unix').reduce(ee.Reducer.max())
+        lastDate = endDate.millis()
+        lastDateImg = ee.Image(lastDate).long().subtract(fire).divide(604800000).int16()
+
+        return lastDateImg.set('system:time_start',endDate,'system:time_end',startDate).rename('historyFire')
+
     def getFire(self, targetYear, targetMonth):
         # Bring in MYD14/MOD14
         modisFire = self.modisFireTerra.merge(self.modisFireAqua)
         singleMonth = modisFire.filter(ee.Filter.calendarRange(targetYear, targetYear, 'year')).filter(
             ee.Filter.calendarRange(targetMonth, targetMonth, 'month'))
-        print(singleMonth.size().getInfo())
+
         # Recode it, and find the year, month, and day- then add it to the map
         singleMonth = singleMonth.map(self.reclassify);
         sum_denisty = singleMonth.select('binary').sum().rename('denisty')
