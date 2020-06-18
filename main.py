@@ -133,7 +133,7 @@ class Vegetation(base):
     def __init__(self):
         super(Vegetation, self).__init__()
 
-    def monthlyNDVI(self, m, y, ic, geometry):
+    def monthlyNDVI(self, m, y, ic, geometry, dur):
         """
         Monthly NDVI(NDVIi, m, y) for each Monitoring Unit (MU) i
         in month m and year y is obtained by averaging the 3 dekadal values in each month
@@ -145,7 +145,7 @@ class Vegetation(base):
         @return: Four band image with 2 month NDVI mean, anomaly, standard anomaly, and Vegetative Control Index
         """
 
-        ic = ic.filter(ee.Filter.calendarRange(m, m, 'month'))
+        ic = ic.filter(ee.Filter.calendarRange(m, m, 'month',dur))
 
         month_i_ic = ic.filter(ee.Filter.calendarRange(y, y, 'year'))
 
@@ -155,7 +155,7 @@ class Vegetation(base):
             **{'reducer': ee.Reducer.stdDev(), 'geometry': geometry, 'scale': 30, 'bestEffort': True,
                'maxPixels': 1e13}).get('NDVI_mean')
 
-        baseline_ic = ic.filter(ee.Filter.calendarRange(y, y - 10, 'year'))
+        baseline_ic = ic.filter(ee.Filter.calendarRange(y-dur[0], y, dur[1]))
         baseline_mean = baseline_ic.mean()
 
         aandvi = month_i_mean.subtract(baseline_mean).float().rename('AANDVI')
