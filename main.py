@@ -29,8 +29,8 @@ class base(object):
         self.brdfCorrect = False
         self.shadowMasking = False
         self.cloudScoreThresh = 20
-
-        self.toaOrSR = False
+        # toa = false sr = true
+        self.toaOrSR = True
 
     def exportMapToAsset(self, img, desc, region, assetbase, **kwargs):
         scale = kwargs.get('scale', 20)
@@ -121,6 +121,7 @@ class Fire(base):
         modisFire = self.modisFireTerra.merge(self.modisFireAqua)
         singleMonth = modisFire.filter(ee.Filter.calendarRange(targetYear, targetYear, 'year')).filter(
             ee.Filter.calendarRange(targetMonth, targetMonth, 'month'))
+        assert singleMonth.size().getInfo(), "No fires found. Try  expanding date range."
 
         # Recode it, and find the year, month, and day- then add it to the map
         singleMonth = singleMonth.map(self.reclassify);
@@ -145,7 +146,7 @@ class Vegetation(base):
         @return: Four band image with 2 month NDVI mean, anomaly, standard anomaly, and Vegetative Control Index
         """
 
-        ic = ic.filter(ee.Filter.calendarRange(m, m, 'month',dur))
+        ic = ic.filter(ee.Filter.calendarRange(m, m, 'month'))
 
         month_i_ic = ic.filter(ee.Filter.calendarRange(y, y, 'year'))
 
@@ -172,14 +173,16 @@ class Vegetation(base):
 
         return ee.Image.cat([month_i_mean, aandvi, sandvi, vci])
 
-    def byRegion(self, m, y, ic, region):
+    def byRegion(self, m, y, ic, region, dur):
         eco = self.ecoregions.filterBounds(region)
         biomes = ee.List(eco.aggregate_array('BIOME_NUM')).distinct()
 
         def monthByRegion(b):
             a = eco.filter(ee.Filter.eq('BIOME_NUM', ee.Number(b)))
             c = ee.Feature(region).difference(ee.Feature(a.union(1).first()))
-            return self.monthlyNDVI(m, y, ic, c.geometry())
+
+            return self.monthlyNDVI(m, y, ic, c.geometry(), dur)
+
 
         ndviByBiome = biomes.map(monthByRegion)
 
@@ -897,8 +900,8 @@ if __name__ == "__main__":
     ee.Initialize()
     # tests
 
-    ndvi_tests = True
-    fire_test = False
+    ndvi_tests = False
+    fire_test = 1
     collection_test = False
     water_tests = False
 
@@ -990,12 +993,13 @@ if __name__ == "__main__":
             print('no')
 
     if fire_test:
-        sd = ee.Date('2019-02-01')
+        modisFire = Fire().modisFireTerra.merge(Fire().modisFireAqua)
+        singleMonth = modisFire.filter(ee.Filter.calendarRange(2020, 2023, 'year')).filter(
+            ee.Filter.calendarRange(3, 3, 'month'))
+        print(singleMonth.size())
 
-        t = Fire().burnOut(sd, -2, 'month')
-        print(t.bandNames().getInfo())
+        assert singleMonth.size().getInfo(), "No fires found. Try  expanding date range."
 
-        pass
     if ndvi_tests:
         ic = ee.ImageCollection("LANDSAT/LC08/C01/T1_SR")
         m = 2
