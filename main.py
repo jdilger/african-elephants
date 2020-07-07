@@ -99,7 +99,7 @@ class Fire(base):
 
         mask = pastFires.select('binary')
         newFires = currentFires.where(mask.eq(1), 0).selfMask()
-        print(currentFires.bandNames().getInfo(),'mask fire')
+
         allCurrentFires = currentFires.select('binary').rename('allFires')
 
         kernel = ee.Kernel.euclidean(100000, 'meters')
