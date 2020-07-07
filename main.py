@@ -157,6 +157,7 @@ class Vegetation(base):
                'maxPixels': 1e13}).get('NDVI_mean')
 
         baseline_ic = ic.filter(ee.Filter.calendarRange(y-dur[0], y, dur[1]))
+
         baseline_mean = baseline_ic.mean()
 
         aandvi = month_i_mean.subtract(baseline_mean).float().rename('AANDVI')

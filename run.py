@@ -46,8 +46,8 @@ vegetationFolder = 'AfricanElephants/vegetationAssets'
 py_date = datetime.datetime.utcnow()
 
 # move back one day to the last date of previous month
-# ed = ee.Date(py_date).advance(-1,'day')
-ed = ee.Date('2019-01-01')
+ed = ee.Date(py_date).advance(-1,'day')
+# ed = ee.Date('2019-01-31')
 
 # Fire products
 fire = main.Fire().burnOut(ed.advance(-1,'month'), -2, 'month').toInt16()
@@ -79,9 +79,9 @@ waterDesc = '%s%s' % ('water_',datestr)
 vegDesc = '%s%s' % ('vegetation_',datestr)
 fireDesc = '%s%s' % ('fire_',datestr)
 
-# main.base().exportMapToCloud(water,'watertest',region,bucket,prefix=waterFolder)
-# main.base().exportMapToCloud(vegetation,'vegetationtest',region,bucket,prefix=vegetationFolder,scale=30)
-# main.base().exportMapToCloud(fire,'firetest',region,bucket,prefix=fireFolder,scale=500)
+main.base().exportMapToCloud(water,waterDesc,region,bucket,prefix=waterFolder,scale=10)
+main.base().exportMapToCloud(vegetation,vegDesc,region,bucket,prefix=vegetationFolder,scale=30)
+main.base().exportMapToCloud(fire,fireDesc,region,bucket,prefix=fireFolder,scale=500)
 
 main.base().exportMapToAsset(water,waterDesc,region,assetbase,scale=10)
 main.base().exportMapToAsset(vegetation,vegDesc,region,assetbase,scale=30)
