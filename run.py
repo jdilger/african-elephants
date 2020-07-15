@@ -50,7 +50,7 @@ ed = ee.Date(py_date).advance(-1,'day')
 # ed = ee.Date('2019-01-31')
 
 # Fire products
-fire = main.Fire().burnOut(ed.advance(-1,'month'), -2, 'month').toInt16()
+fire = main.Fire().burnOut(ed, -2, 'month').toInt16()
 historyFireStartDate = ed.advance(fireHistoryLength[0],fireHistoryLength[1])
 historyFire = main.Fire().historyFire(historyFireStartDate,ed)
 
