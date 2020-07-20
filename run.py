@@ -5,6 +5,8 @@ import datetime
 ee.Initialize()
 
 # region of interest
+# region needs to be a geometry.
+# region = ee.FeatureCollection('users/path/to/feature').geometry().bounds()
 region = ee.Geometry.Polygon([[[22.37055462536107, -19.69234130304949],
                                    [23.161822166438526, -19.675148989974225],
                                    [23.519800725057106, -18.180985057390387],
@@ -34,7 +36,11 @@ waterHistoryLength = [-2,'month']
 # Export information
 bucket = 'wwf-gee-bucket'
 # export to asset base path
-assetbase = "users/TEST"
+assetbase = "projects/wwf-de/African_Elephants/"
+# Image collection names that are within the base path
+fireIC = 'fire'
+waterIC = 'water'
+vegetationIC = 'veg'
 
 # # export to cloud
 fireFolder = 'AfricanElephants/fireAssets'
@@ -83,6 +89,6 @@ main.base().exportMapToCloud(water,waterDesc,region,bucket,prefix=waterFolder,sc
 main.base().exportMapToCloud(vegetation,vegDesc,region,bucket,prefix=vegetationFolder,scale=30)
 main.base().exportMapToCloud(fire,fireDesc,region,bucket,prefix=fireFolder,scale=500)
 
-main.base().exportMapToAsset(water,waterDesc,region,assetbase,scale=10)
-main.base().exportMapToAsset(vegetation,vegDesc,region,assetbase,scale=30)
-main.base().exportMapToAsset(fire,fireDesc,region,assetbase,scale=500)
+main.base().exportMapToAsset(water,waterDesc,region,assetbase+waterIC,scale=10)
+main.base().exportMapToAsset(vegetation,vegDesc,region,assetbase+vegetationIC,scale=30)
+main.base().exportMapToAsset(fire,fireDesc,region,assetbase+fireIC,scale=500)
