@@ -218,14 +218,14 @@ class Water(base):
             .filter(ee.Filter.eq('chour', 12)) \
             .filter(ee.Filter.eq('test', 1)).median()
 
-        chirps = ee.ImageCollection("UCSB-CHG/CHIRPS/PENTAD").filterBounds(self.studyArea).filterDate(ee.Date(sd),
-                                                                                                      ee.Date(ed)).sum()
+
         cfs = ee.ImageCollection('NOAA/CFSV2/FOR6H').select(['Precipitation_rate_surface_6_Hour_Average'],
                                                             ['precip']).filterDate(sd, ed).filterBounds(
             self.studyArea).sum()
         smap = ee.ImageCollection("NASA_USDA/HSL/SMAP_soil_moisture").select('ssm').filterDate(sd, ed).sum()
 
         gsmap = ee.ImageCollection("JAXA/GPM_L3/GSMaP/v6/operational").filter(ee.Filter.eq('status','permanent')).select('hourlyPrecipRateGC')
+        chirps = gsmap.filterBounds(self.studyArea).filterDate(ee.Date(sd), ee.Date(ed)).sum().rename('percip')
         chirps_spi = self.spi(gsmap,sd,ed).rename('chirps_spi')
 
         img = collection.map(self.waterindicies).median()
