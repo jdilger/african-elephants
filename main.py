@@ -68,7 +68,7 @@ class base(object):
 
 
 class Fire(base):
-    # todo: add check for no fires in current/previous months
+
     def __init__(self):
         super(Fire, self).__init__()
 
@@ -149,7 +149,7 @@ class Vegetation(base):
         ic = ic.filter(ee.Filter.calendarRange(m, m, 'month'))
 
         month_i_ic = ic.filter(ee.Filter.calendarRange(y, y, 'year'))
-
+        print('Veg ic month m size',month_i_ic.size().getInfo())
         month_i_mean = month_i_ic.mean().rename('NDVI_mean')
 
         month_i_mean_std = month_i_mean.reduceRegion(
@@ -224,8 +224,9 @@ class Water(base):
                                                             ['precip']).filterDate(sd, ed).filterBounds(
             self.studyArea).sum()
         smap = ee.ImageCollection("NASA_USDA/HSL/SMAP_soil_moisture").select('ssm').filterDate(sd, ed).sum()
-        chirps_spi = self.spi(ee.ImageCollection("UCSB-CHG/CHIRPS/PENTAD").filterBounds(self.studyArea), sd, ed).rename(
-            'chirps_spi')
+
+        gsmap = ee.ImageCollection("JAXA/GPM_L3/GSMaP/v6/operational").filter(ee.Filter.eq('status','permanent')).select('hourlyPrecipRateGC')
+        chirps_spi = self.spi(gsmap,sd,ed).rename('chirps_spi')
 
         img = collection.map(self.waterindicies).median()
         img = ee.Image.cat([img, gfs, chirps, cfs, smap, chirps_spi]).set('system:time_start', sd, 'sd', sd, 'ed', ed)
@@ -904,7 +905,7 @@ if __name__ == "__main__":
     ndvi_tests = False
     fire_test = 1
     collection_test = False
-    water_tests = False
+    water_tests = True
 
     region = ee.Geometry.Polygon([[[22.37055462536107, -19.69234130304949],
                                    [23.161822166438526, -19.675148989974225],
