@@ -52,8 +52,8 @@ vegetationFolder = 'AfricanElephants/vegetationAssets'
 py_date = datetime.datetime.utcnow()
 
 # move back one day to the last date of previous month
-ed = ee.Date(py_date).advance(-1,'day')
-# ed = ee.Date('2019-01-31')
+ed = ee.Date(py_date).advance(-16,'day')
+# ed = ee.Date('2020-09-30')
 
 # Fire products
 fire = main.Fire().burnOut(ed, -2, 'month').toInt16()
