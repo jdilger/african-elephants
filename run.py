@@ -103,6 +103,6 @@ if __name__ == "__main__":
    
     fire = make_fire()
     vegetation = make_vegetation()
-    watter = make_water()
+    water = make_water()
 
     export_imgs()
