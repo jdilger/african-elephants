@@ -6,8 +6,9 @@ import view_angles
 
 class base(object):
     def __init__(self):
-        self.date = 123
-        self.studyArea = ee.FeatureCollection('somehwrere').geometry()
+        self.TEST = True
+        # self.date = 123
+        # self.studyArea = ee.FeatureCollection('somehwrere').geometry()
 
         # Vegetation
         self.ecoregions = ee.FeatureCollection('RESOLVE/ECOREGIONS/2017')
@@ -16,13 +17,13 @@ class base(object):
         self.modisFireAqua = ee.ImageCollection('MODIS/006/MYD14A2').select([0])
         self.modisFireTerra = ee.ImageCollection('MODIS/006/MOD14A2').select([0])
 
-        # self.startDate = ee.Date('2019-01-01')
-        self.startDate = ee.Date('2019-04-01')
-        self.endDate = ee.Date('2019-06-01')
-        self.studyArea = ee.Geometry.Polygon([[[22.58124445939474, -18.13023785466269],
-                                               [22.58124445939474, -18.203308698548458],
-                                               [22.68012141251974, -18.203308698548458],
-                                               [22.68012141251974, -18.13023785466269]]])
+        self.startDate = "" #ee.Date('2019-01-01')
+        # self.startDate = ee.Date('2019-04-01')
+        self.endDate = "" #ee.Date('2019-06-01')
+        self.studyArea = ""#ee.Geometry.Polygon([[[22.58124445939474, -18.13023785466269],
+                                            #    [22.58124445939474, -18.203308698548458],
+                                            #    [22.68012141251974, -18.203308698548458],
+                                            #    [22.68012141251974, -18.13023785466269]]])
         self.metadataCloudCoverMax = 80
         self.maskSR = True
         self.cloudMask = True
@@ -73,6 +74,25 @@ class Fire(base):
         super(Fire, self).__init__()
 
     def reclassify(self, img):
+        """ reclassifies MODIS Thermal Anomalies & Fire 8-Day Global 1km FireMask band.
+            1: Not processed (obsolete; not used since Collection 1) ->0
+            2: Not processed (other reason) -> 0
+            3: Non-fire water pixel -> 0
+            4: Cloud (land or water) -> 1
+            5: Non-fire land pixel -> 1
+            6: Unknown (land or water) -> 1
+            7: Fire (low confidence, land or water) -> 2
+            8: Fire (nominal confidence, land or water) -> 3
+            9: Fire (high confidence, land or water) -> 4
+
+            creates binary image of fire for pixels rated low to high confidence. 
+            creates bands for year,day, and month for later use
+            Args:
+                img: The FireMask band of an MODIS Thermal Anomalies image 
+            
+            Returns:
+                image - original image, binary mask, day, year, month, and unix time
+        """
         remapped = img.remap([0, 1, 2, 3, 4, 5, 6, 7, 8, 9], [0, 0, 0, 1, 1, 1, 1, 2, 3, 4]).rename(['confidence'])
         d = ee.Date(img.get('system:time_start'))
         y = ee.Image(d.get('year')).int16().rename(['year'])
@@ -139,11 +159,12 @@ class Vegetation(base):
         Monthly NDVI(NDVIi, m, y) for each Monitoring Unit (MU) i
         in month m and year y is obtained by averaging the 3 dekadal values in each month
         full text: https://www.frontiersin.org/articles/10.3389/fenvs.2019.00187/full
-        @param self:
-        @param m: month as integer
-        @param y: year as integer
-        @param ic: NDVI image collection
-        @return: Four band image with 2 month NDVI mean, anomaly, standard anomaly, and Vegetative Control Index
+        Args:
+            m: month as integer
+            y: year as integer
+            ic: NDVI image collection
+        Returns:
+            image - Four band image with 2 month NDVI mean, anomaly, standard anomaly, and Vegetative Control Index
         """
 
         ic = ic.filter(ee.Filter.calendarRange(m, m, 'month'))
@@ -196,13 +217,26 @@ class Water(base):
     def __init__(self):
         super(Water, self).__init__()
 
-    def wlc(self, collection, **kwargs):
+    def wlc(self, collection, studyArea, **kwargs):
+        """ creates a the image used for the weighted linear combination (or weighted sum) of water stress indicators.  
+        Adds bands for NOAA/GFS0P25, NOAA/CFSV2/FOR6H, NASA_USDA/HSL/SMAP_soil_moisture, and JAXA/GPM_L3/GSMaP/v6/operational.
+
+        Args:
+            collection: A Sentinel-2 collection
+            studyArea: A ee geometry 
+            startDate : Optional* defines start date for additional image collections. defaults to self
+            endDate : Optional* defines end date for additional image collections. defaults to self
+
+        Returns:
+            image - Multiband image for wlcexpression
+         """
         valid_kwagrs = ['startDate', 'endDate']
         if len(kwargs.keys()) > 0 and len([i for i in valid_kwagrs if i in kwargs]) != len(kwargs.keys()):
             return print('Only valid arguments are startDate and endDate check that all key word are correct:{}'.format(
                 kwargs.keys()))
         sd = kwargs.get('startDate', self.startDate)
         ed = kwargs.get('endDate', self.endDate)
+
 
         def forecastscleaning(img):
             chour = ee.Date(img.get('creation_time')).get('hour')
@@ -221,11 +255,11 @@ class Water(base):
 
         cfs = ee.ImageCollection('NOAA/CFSV2/FOR6H').select(['Precipitation_rate_surface_6_Hour_Average'],
                                                             ['precip']).filterDate(sd, ed).filterBounds(
-            self.studyArea).sum()
+            studyArea).sum()
         smap = ee.ImageCollection("NASA_USDA/HSL/SMAP_soil_moisture").select('ssm').filterDate(sd, ed).sum()
 
         gsmap = ee.ImageCollection("JAXA/GPM_L3/GSMaP/v6/operational").filter(ee.Filter.eq('status','permanent')).select('hourlyPrecipRateGC')
-        chirps = gsmap.filterBounds(self.studyArea).filterDate(ee.Date(sd), ee.Date(ed)).sum().rename('percip')
+        chirps = gsmap.filterBounds(studyArea).filterDate(ee.Date(sd), ee.Date(ed)).sum().rename('percip')
         chirps_spi = self.spi(gsmap,sd,ed).rename('chirps_spi')
 
         img = collection.map(self.waterindicies).median()
@@ -233,6 +267,14 @@ class Water(base):
         return img
 
     def wlcexpression(self, img, region):
+        """ The weighted linear combination expression computes the final output of water stress
+
+        Args:
+            img: image output from wlc
+            region: A ee geometry 
+
+        Returns:
+            image - single band image water stress"""
         img = img.select(['tcw', 'chirps_spi', 'ssm', 'mndwi', 'nwi', 'ndmi', 'temperature_2m_above_ground', 'ndwi'])
         img = self.normalizeBands(img, region)
         exout = img.expression("(b1*f1) +(b2 * f2) + (b3 *f3) + (b4 * f4)+ (b5 * f5)+ (b6 * f6)+ (b7 * f7)+ (b8 * f8)",
@@ -462,8 +504,8 @@ class landsat(base):
         """apply cf-mask Landsat"""
         QA = img.select("pixel_qa")
 
-        shadow = QA.bitwiseAnd(8).neq(0);
-        cloud = QA.bitwiseAnd(32).neq(0);
+        shadow = QA.bitwiseAnd(8).neq(0)
+        cloud = QA.bitwiseAnd(32).neq(0)
         return img.updateMask(shadow.Not()).updateMask(cloud.Not()).copyProperties(img)
 
     def maskClouds(self, img):

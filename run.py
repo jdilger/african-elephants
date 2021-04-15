@@ -58,10 +58,12 @@ ed = ee.Date(py_date).advance(-16,'day')
 # Fire products
 def make_fire():
     fire = main.Fire().burnOut(ed, -2, 'month').toInt16()
+
     historyFireStartDate = ed.advance(fireHistoryLength[0],fireHistoryLength[1])
     historyFire = main.Fire().historyFire(historyFireStartDate,ed)
 
     fire = fire.addBands(historyFire).select(['confidence', 'allFires', 'past', 'distance10k', 'historyFire'])
+
     return fire
 # Vegetation products
 def nd(image):
@@ -80,7 +82,7 @@ def make_water():
     # Water products
     sd = ee.Date(ed).advance(waterHistoryLength[0],waterHistoryLength[1])
     sen2 = main.sentinel2().preprocess(startDate=sd,endDate=ed,studyArea=region).select(['blue', 'green', 'red', 'nir', 'swir1', 'swir2'])
-    img = main.Water().wlc(sen2, startDate=sd,endDate=ed)
+    img = main.Water().wlc(sen2, region, startDate=sd,endDate=ed)
     water = main.Water().wlcexpression(img, region)
     
     return water
@@ -105,4 +107,4 @@ if __name__ == "__main__":
     vegetation = make_vegetation()
     water = make_water()
 
-    export_imgs()
+    # export_imgs()
